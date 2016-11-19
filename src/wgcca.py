@@ -205,7 +205,7 @@ class WeightedGCCA:
     self._compute(views, K, incremental)
     return self
   
-  def apply(self, views, K=None, scaleBySv=False):
+  def apply(self, views, keptViews, K=None, scaleBySv=False):
     '''
     Extracts WGCCA embedding for new set of examples.  Maps each present view with
     $U_i$ and takes mean of embeddings.
@@ -224,7 +224,11 @@ class WeightedGCCA:
     if K is None:
       K = np.ones((N, self.V)) # Assume we have data for all views/examples
     
-    for U, v in zip(Us, views):
+    for i, elem in enumerate(zip(Us, views)):
+      U = elem[0]
+      v = elem[1]
+      if not i in keptViews:
+        continue # skip non-kept views
       projViews.append( v.dot(U) )
     projViewsStacked = np.stack(projViews)
     
@@ -236,7 +240,8 @@ class WeightedGCCA:
     denom = weighting.sum(axis=1).reshape((N, 1))
     
     # Weight each view
-    weightedViews = weighting.T.reshape((self.V, N, 1)) * projViewsStacked
+    w_shape = weighting.T.shape
+    weightedViews = weighting.T.reshape((w_shape[0], w_shape[1], 1)) * projViewsStacked
     
     Gsum = weightedViews.sum(axis=0)
     Gprime = Gsum/denom
@@ -405,7 +410,7 @@ def main(inPath, outPath, modelPath, k, keptViews=None, weights=None, regs=None,
   
   # Save training set embeddings
   if outPath:
-    G = wgcca.apply(views, K, scaleBySv)
+    G = wgcca.apply(views, keptViews, K, scaleBySv)
     np.savez_compressed(outPath, ids=ids, G=G)
 
 if __name__ == '__main__':
